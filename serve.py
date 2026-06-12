@@ -19,11 +19,29 @@ def model_exists():
     return os.path.isfile(os.path.join(PROJECT_DIR, 'model', 'model.pth'))
 
 
-def spawn(command):
-    kwargs = {'cwd': PROJECT_DIR}
+def _quote(arg):
+    return f'"{arg}"' if ' ' in arg else arg
+
+
+def spawn(command, title='Snake RL'):
+    """Open a visible terminal window so training output is not hidden."""
+    args = [_quote(PYTHON)] + [_quote(a) for a in command]
+    cmd_line = ' '.join(args)
+
     if sys.platform == 'win32':
-        kwargs['creationflags'] = subprocess.CREATE_NEW_CONSOLE
-    subprocess.Popen([PYTHON] + command, **kwargs)
+        subprocess.Popen(
+            f'start "{title}" cmd /k {cmd_line}',
+            cwd=PROJECT_DIR,
+            shell=True,
+        )
+    elif sys.platform == 'darwin':
+        script = f'cd {_quote(PROJECT_DIR)} && {cmd_line}'
+        subprocess.Popen(['osascript', '-e', f'tell app "Terminal" to do script "{script}"'])
+    else:
+        subprocess.Popen(
+            ['x-terminal-emulator', '-e', f'cd {PROJECT_DIR} && {cmd_line}'],
+            cwd=PROJECT_DIR,
+        )
 
 
 PAGE = f"""<!DOCTYPE html>
@@ -122,12 +140,13 @@ PAGE = f"""<!DOCTYPE html>
 <body>
   <div class="card">
     <h1>Snake RL</h1>
-    <p>Pure self-learning DQN agent for Snake. Launch the pygame window from here or use the commands below.</p>
+    <p>Pure self-learning DQN agent for Snake. <strong>Play</strong> opens the game window.
+    <strong>Train</strong> opens a terminal (no game window — headless training).</p>
     <a class="url" href="{BASE_URL}">{BASE_URL}</a>
 
     <div class="actions">
-      <button onclick="launch('play')">Play — watch the AI (visual)</button>
-      <button class="secondary" onclick="launch('train')">Train — 100 games (headless)</button>
+      <button onclick="launch('play')">Play — opens pygame window</button>
+      <button class="secondary" onclick="launch('train')">Train — 100 games (opens terminal)</button>
     </div>
 
     <div id="status"></div>
@@ -204,16 +223,16 @@ class LauncherHandler(BaseHTTPRequestHandler):
                     'message': 'No model found. Train first with train.py.',
                 }, 400)
                 return
-            spawn(['evaluate.py', '--visual'])
+            spawn(['evaluate.py', '--visual'], title='Snake RL — Play')
             self._json({
                 'ok': True,
-                'message': 'Game launched. A pygame window should open shortly.',
+                'message': 'Pygame window launching — check taskbar if hidden.',
             })
         elif path == '/api/train':
-            spawn(['train.py', '--games', '100'])
+            spawn(['train.py', '--games', '100'], title='Snake RL — Train')
             self._json({
                 'ok': True,
-                'message': 'Training started in a new terminal (100 games, headless).',
+                'message': 'Training terminal opening — watch scores print there (no game window).',
             })
         else:
             self.send_error(404)

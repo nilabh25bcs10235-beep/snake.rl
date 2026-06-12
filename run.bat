@@ -4,7 +4,7 @@ if not exist "venv\Scripts\python.exe" (
   echo Creating virtual environment...
   python -m venv venv
   call venv\Scripts\activate.bat
-  pip install -r requirements.txt
+  pip install -r requirements-ml.txt
 ) else (
   call venv\Scripts\activate.bat
 )

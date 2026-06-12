@@ -1,0 +1,12 @@
+[project]
+name = "snake-rl"
+version = "0.1.0"
+description = "Pure self-learning DQN Snake agent"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi>=0.117.1",
+]
+
+[tool.vercel]
+entrypoint = "app:app"

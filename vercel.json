@@ -1,0 +1,12 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "installCommand": "pip install -r requirements.txt",
+  "functions": {
+    "app.py": {
+      "excludeFiles": "{venv/**,model/**,__pycache__/**,api/__pycache__/**,*.pth,*.png,train.py,evaluate.py,game.py,agent.py,model.py,serve.py,run.bat}"
+    },
+    "api/**/*.py": {
+      "excludeFiles": "{venv/**,model/**,__pycache__/**,*.pth,*.png,train.py,evaluate.py,game.py,agent.py,model.py,serve.py,run.bat}"
+    }
+  }
+}

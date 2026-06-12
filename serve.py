@@ -138,7 +138,7 @@ PAGE = f"""<!DOCTYPE html>
 cd snake.rl
 python -m venv venv
 venv\\Scripts\\activate
-pip install -r requirements.txt
+pip install -r requirements-ml.txt
 python serve.py</pre>
 
     <h3>CLI commands</h3>

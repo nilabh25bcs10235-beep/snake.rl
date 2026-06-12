@@ -24,7 +24,7 @@ Then open **[http://localhost:8080](http://localhost:8080)** in your browser.
 
 ### Deploy on Vercel
 
-This repo includes a Vercel-compatible entrypoint (`app.py`). The live site shows project info and run instructions. The pygame game itself runs locally — not on serverless.
+This repo includes a Vercel-compatible entrypoint (`api/index.py`). The live site shows project info and run instructions. The pygame game itself runs locally — not on serverless.
 
 ```bash
 # Vercel uses requirements.txt (FastAPI only)
@@ -92,8 +92,8 @@ Close the pygame window to stop visual evaluation.
 
 ```
 snake.rl/
-├── app.py          # Vercel entrypoint (FastAPI landing page)
-├── api/index.py    # Vercel API route
+├── api/index.py    # Vercel entrypoint (FastAPI landing page)
+├── app.py          # Re-exports api.index for local use
 ├── serve.py        # Local launcher → http://localhost:8080
 ├── train.py        # Train the DQN agent
 ├── evaluate.py     # Run a saved model

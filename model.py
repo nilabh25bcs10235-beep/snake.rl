@@ -41,11 +41,18 @@ class QTrainer:
     def sync_target(self):
         self.target_model.load_state_dict(self.model.state_dict())
 
+    def _as_array(self, data):
+        if isinstance(data, np.ndarray):
+            return data
+        if isinstance(data, (list, tuple)) and data and isinstance(data[0], np.ndarray):
+            return np.stack(data)
+        return np.asarray(data)
+
     def train_step(self, state, action, reward, next_state, done):
-        state = torch.tensor(np.array(state), dtype=torch.float)
-        action = torch.tensor(np.array(action), dtype=torch.long)
-        reward = torch.tensor(np.array(reward), dtype=torch.float)
-        next_state = torch.tensor(np.array(next_state), dtype=torch.float)
+        state = torch.tensor(self._as_array(state), dtype=torch.float)
+        action = torch.tensor(self._as_array(action), dtype=torch.long)
+        reward = torch.tensor(self._as_array(reward), dtype=torch.float)
+        next_state = torch.tensor(self._as_array(next_state), dtype=torch.float)
 
         if state.dim() == 1:
             state = state.unsqueeze(0)

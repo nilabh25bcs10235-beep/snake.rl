@@ -28,10 +28,11 @@ FOOD_GLOW = (255, 150, 80)
 ACCENT    = (100, 180, 255)
 
 class SnakeGame:
-    def __init__(self, w=640, h=480, headless=False):
+    def __init__(self, w=640, h=480, headless=False, step_limit_per_length=100):
         self.w = w
         self.h = h
         self.headless = headless
+        self.step_limit_per_length = step_limit_per_length
         self.grid_w = w // BLOCK
         self.grid_h = h // BLOCK
 
@@ -59,11 +60,13 @@ class SnakeGame:
 
     def reset(self):
         self.direction = Direction.RIGHT
-        self.head = Point(self.w // 2, self.h // 2)
+        cx = self.w // 2
+        cy = self.h // 2
+        self.head = Point(cx, cy)
         self.snake = [
-            self.head,
-            Point(self.head.x - BLOCK, self.head.y),
-            Point(self.head.x - 2 * BLOCK, self.head.y),
+            Point(cx, cy),
+            Point(cx - BLOCK, cy),
+            Point(cx - 2 * BLOCK, cy),
         ]
         self.score = 0
         self.food = None
@@ -71,11 +74,15 @@ class SnakeGame:
         self._place_food()
 
     def _place_food(self):
-        x = random.randint(0, (self.w - BLOCK) // BLOCK) * BLOCK
-        y = random.randint(0, (self.h - BLOCK) // BLOCK) * BLOCK
-        self.food = Point(x, y)
-        if self.food in self.snake:
-            self._place_food()
+        cells = [
+            Point(x * BLOCK, y * BLOCK)
+            for x in range(self.grid_w)
+            for y in range(self.grid_h)
+            if Point(x * BLOCK, y * BLOCK) not in self.snake
+        ]
+        if not cells:
+            return
+        self.food = random.choice(cells)
 
     def play_step(self, action):
         self.frame_iteration += 1
@@ -92,7 +99,11 @@ class SnakeGame:
         reward = 0
         game_over = False
 
-        if self.is_collision() or self.frame_iteration > 100 * len(self.snake):
+        timed_out = (
+            self.step_limit_per_length is not None
+            and self.frame_iteration > self.step_limit_per_length * len(self.snake)
+        )
+        if self.is_collision() or timed_out:
             game_over = True
             reward = -10
             if not self.headless:
@@ -192,55 +203,41 @@ class SnakeGame:
         for y in range(0, self.h, BLOCK):
             pygame.draw.line(self.display, GRID, (0, y), (self.w, y), 1)
 
+    def _segment_rect(self, pt, inset=1):
+        return pygame.Rect(pt.x + inset, pt.y + inset, BLOCK - 2 * inset, BLOCK - 2 * inset)
+
     def _draw_snake(self):
         length = len(self.snake)
         for i, pt in enumerate(self.snake):
-            cx = pt.x + BLOCK // 2
-            cy = pt.y + BLOCK // 2
             t = i / max(length - 1, 1)
             color = self._lerp_color(HEAD_COL, TAIL_COL, t)
-            radius = BLOCK // 2 - 1
-
+            rect = self._segment_rect(pt, inset=1 if i else 0)
+            pygame.draw.rect(self.display, color, rect, border_radius=4 if i == 0 else 3)
             if i == 0:
-                pygame.draw.circle(self.display, (20, 80, 60), (cx, cy), radius + 2)
-                pygame.draw.circle(self.display, color, (cx, cy), radius)
-                self._draw_eyes(cx, cy)
-            else:
-                pygame.draw.circle(self.display, color, (cx, cy), radius - 1)
+                self._draw_head_marker(rect)
 
-    def _draw_eyes(self, cx, cy):
-        eye_offset = 5
-        eye_r = 3
-        pupil_r = 1
-        white = (240, 250, 245)
-        pupil = (20, 30, 40)
-
+    def _draw_head_marker(self, rect):
+        cx = rect.centerx
+        cy = rect.centery
+        marker = (18, 40, 32)
         if self.direction == Direction.RIGHT:
-            positions = [(cx + 4, cy - eye_offset), (cx + 4, cy + eye_offset)]
+            points = [(rect.right - 4, cy), (rect.right - 12, cy - 5), (rect.right - 12, cy + 5)]
         elif self.direction == Direction.LEFT:
-            positions = [(cx - 4, cy - eye_offset), (cx - 4, cy + eye_offset)]
+            points = [(rect.left + 4, cy), (rect.left + 12, cy - 5), (rect.left + 12, cy + 5)]
         elif self.direction == Direction.UP:
-            positions = [(cx - eye_offset, cy - 4), (cx + eye_offset, cy - 4)]
+            points = [(cx, rect.top + 4), (cx - 5, rect.top + 12), (cx + 5, rect.top + 12)]
         else:
-            positions = [(cx - eye_offset, cy + 4), (cx + eye_offset, cy + 4)]
-
-        for ex, ey in positions:
-            pygame.draw.circle(self.display, white, (ex, ey), eye_r)
-            pygame.draw.circle(self.display, pupil, (ex, ey), pupil_r)
+            points = [(cx, rect.bottom - 4), (cx - 5, rect.bottom - 12), (cx + 5, rect.bottom - 12)]
+        pygame.draw.polygon(self.display, marker, points)
 
     def _draw_food(self):
-        cx = self.food.x + BLOCK // 2
-        cy = self.food.y + BLOCK // 2
-        pulse = 0.88 + 0.12 * math.sin(self._anim_frame * 0.2)
-        glow_r = int((BLOCK // 2 + 4) * pulse)
-        core_r = int((BLOCK // 2 - 2) * pulse)
-
-        glow_surf = pygame.Surface((glow_r * 2, glow_r * 2), pygame.SRCALPHA)
-        pygame.draw.circle(glow_surf, (*FOOD_GLOW, 70), (glow_r, glow_r), glow_r)
-        self.display.blit(glow_surf, (cx - glow_r, cy - glow_r))
-
-        pygame.draw.circle(self.display, FOOD_COL, (cx, cy), core_r)
-        pygame.draw.circle(self.display, (255, 200, 160), (cx - 3, cy - 3), 3)
+        if self.food is None:
+            return
+        pulse = 0.9 + 0.1 * math.sin(self._anim_frame * 0.2)
+        inset = int((1 - pulse) * 3)
+        rect = self._segment_rect(self.food, inset=inset)
+        pygame.draw.rect(self.display, FOOD_GLOW, rect.inflate(4, 4), border_radius=6)
+        pygame.draw.rect(self.display, FOOD_COL, rect, border_radius=5)
 
     def _draw_hud(self, game_over=False):
         panel = pygame.Surface((self.w, 52), pygame.SRCALPHA)
@@ -252,8 +249,9 @@ class SnakeGame:
 
         lines = [
             (self._title_font, f'Game {self.current_game}', ACCENT, (14, 10)),
-            (self._hud_font, f'Length: {len(self.snake)}', WHITE, (14, 30)),
-            (self._hud_font, f'Best: {best_display}', (180, 220, 180), (200, 30)),
+            (self._hud_font, f'Score: {self.score}', WHITE, (14, 30)),
+            (self._hud_font, f'Length: {len(self.snake)}', (200, 210, 220), (120, 30)),
+            (self._hud_font, f'Best: {best_display}', (180, 220, 180), (260, 30)),
         ]
 
         for font, text, color, pos in lines:

@@ -46,7 +46,7 @@ def format_elapsed(seconds):
     return f'{minutes}m {secs}s'
 
 
-def train(headless=True, plot_every=25):
+def train(headless=True, plot_every=25, max_games=None, target_score=None):
     os.chdir(PROJECT_DIR)
     start_time = time.time()
 
@@ -62,11 +62,21 @@ def train(headless=True, plot_every=25):
     game = SnakeGame(headless=headless)
 
     mode = 'headless (fast)' if headless else 'visual'
-    print(f'Starting training [{mode}] — close pygame window to stop.')
+    stop_notes = []
+    if max_games is not None:
+        stop_notes.append(f'stop after {max_games} games')
+    if target_score is not None:
+        stop_notes.append(f'stop at score {target_score}')
+    stop_label = f", {', '.join(stop_notes)}" if stop_notes else ''
+
+    print(f'Starting training [{mode}{stop_label}] — close pygame window to stop.')
     print(f'{"Game":>6}  {"Score":>6}  {"Best":>6}  {"Mean":>8}  {"Roll100":>8}  {"Time":>8}')
     print('-' * 55)
 
     while True:
+        if max_games is not None and agent.n_games >= max_games:
+            break
+
         if not headless:
             game.set_game_info(agent.n_games + 1, best_length)
 
@@ -113,10 +123,32 @@ def train(headless=True, plot_every=25):
             if agent.n_games % plot_every == 0:
                 plot(scores, mean_scores, rolling_means)
 
+            if target_score is not None and best_score >= target_score:
+                print(f'\nTarget score {target_score} reached in game {agent.n_games}.')
+                break
+
+    if scores:
+        plot(scores, mean_scores, rolling_means)
+
+    elapsed = time.time() - start_time
+    print(f'\nTraining finished after {agent.n_games} games in {format_elapsed(elapsed)}.')
+    print(f'Best score: {best_score}  |  Best rolling mean: {best_rolling:.2f}')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train Snake RL agent')
-    parser.add_argument('--visual', action='store_true')
-    parser.add_argument('--plot-every', type=int, default=25)
+    parser.add_argument('--visual', action='store_true',
+                        help='Show pygame window (much slower than headless)')
+    parser.add_argument('--games', type=int, default=None,
+                        help='Stop after this many games (default: run until interrupted)')
+    parser.add_argument('--target-score', type=int, default=None,
+                        help='Stop once a single game reaches this score')
+    parser.add_argument('--plot-every', type=int, default=25,
+                        help='Update progress.png every N games')
     args = parser.parse_args()
-    train(headless=not args.visual, plot_every=args.plot_every)
+    train(
+        headless=not args.visual,
+        plot_every=args.plot_every,
+        max_games=args.games,
+        target_score=args.target_score,
+    )

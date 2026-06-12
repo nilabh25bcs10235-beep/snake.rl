@@ -16,7 +16,8 @@ class Direction(Enum):
 Point = namedtuple('Point', 'x, y')
 
 BLOCK  = 20
-SPEED  = 55
+SPEED  = 55          # normal play / evaluate
+TRAIN_SPEED = 0      # 0 = uncapped FPS for fast visual training
 WHITE  = (245, 245, 245)
 
 BG        = (12, 18, 32)
@@ -28,16 +29,19 @@ FOOD_GLOW = (255, 150, 80)
 ACCENT    = (100, 180, 255)
 
 class SnakeGame:
-    def __init__(self, w=640, h=480, headless=False, step_limit_per_length=100):
+    def __init__(self, w=640, h=480, headless=False, step_limit_per_length=100, fps=SPEED):
         self.w = w
         self.h = h
         self.headless = headless
         self.step_limit_per_length = step_limit_per_length
+        self.fps = fps
         self.grid_w = w // BLOCK
         self.grid_h = h // BLOCK
 
         self.current_game = 1
         self.session_best_length = 3
+        self.training_total = None
+        self.training_best_score = 0
         self._anim_frame = 0
         self._eat_flash = 0
 
@@ -53,10 +57,15 @@ class SnakeGame:
 
         self.reset()
 
-    def set_game_info(self, current_game, session_best_length=None):
+    def set_game_info(self, current_game, session_best_length=None,
+                      training_total=None, training_best_score=None):
         self.current_game = current_game
         if session_best_length is not None:
             self.session_best_length = session_best_length
+        if training_total is not None:
+            self.training_total = training_total
+        if training_best_score is not None:
+            self.training_best_score = training_best_score
 
     def reset(self):
         self.direction = Direction.RIGHT
@@ -108,7 +117,7 @@ class SnakeGame:
             reward = -10
             if not self.headless:
                 self._update_ui(game_over=True)
-                self.clock.tick(SPEED)
+                self._tick()
             return reward, game_over, self.score
 
         if self.head == self.food:
@@ -121,8 +130,12 @@ class SnakeGame:
 
         if not self.headless:
             self._update_ui()
-            self.clock.tick(SPEED)
+            self._tick()
         return reward, game_over, self.score
+
+    def _tick(self):
+        if self.fps > 0:
+            self.clock.tick(self.fps)
 
     def is_collision(self, pt=None):
         if pt is None:
@@ -247,11 +260,17 @@ class SnakeGame:
 
         best_display = max(self.session_best_length, len(self.snake))
 
+        if self.training_total:
+            title = f'Training {self.current_game}/{self.training_total}'
+        else:
+            title = f'Game {self.current_game}'
+
         lines = [
-            (self._title_font, f'Game {self.current_game}', ACCENT, (14, 10)),
+            (self._title_font, title, ACCENT, (14, 10)),
             (self._hud_font, f'Score: {self.score}', WHITE, (14, 30)),
             (self._hud_font, f'Length: {len(self.snake)}', (200, 210, 220), (120, 30)),
-            (self._hud_font, f'Best: {best_display}', (180, 220, 180), (260, 30)),
+            (self._hud_font, f'Best: {max(best_display, self.training_best_score)}',
+             (180, 220, 180), (260, 30)),
         ]
 
         for font, text, color, pos in lines:

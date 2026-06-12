@@ -7,7 +7,7 @@ matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 from agent import Agent
-from game import SnakeGame
+from game import SnakeGame, TRAIN_SPEED
 
 PROJECT_DIR = os.path.dirname(os.path.abspath(__file__))
 ROLLING_WINDOW = 100
@@ -46,7 +46,8 @@ def format_elapsed(seconds):
     return f'{minutes}m {secs}s'
 
 
-def train(headless=True, plot_every=25, max_games=None, target_score=None):
+def train(headless=True, fast=False, quiet=False, plot_every=25,
+          max_games=None, target_score=None):
     os.chdir(PROJECT_DIR)
     start_time = time.time()
 
@@ -59,26 +60,41 @@ def train(headless=True, plot_every=25, max_games=None, target_score=None):
     best_rolling = 0
 
     agent = Agent()
-    game = SnakeGame(headless=headless)
+    fps = TRAIN_SPEED if (not headless and fast) else None
+    if not headless and fps is None:
+        from game import SPEED
+        fps = SPEED
+    game = SnakeGame(headless=headless, fps=fps if fps is not None else 0)
 
-    mode = 'headless (fast)' if headless else 'visual'
-    stop_notes = []
-    if max_games is not None:
-        stop_notes.append(f'stop after {max_games} games')
-    if target_score is not None:
-        stop_notes.append(f'stop at score {target_score}')
-    stop_label = f", {', '.join(stop_notes)}" if stop_notes else ''
+    visual_fast = not headless and fast
+    if quiet or visual_fast:
+        quiet = True
 
-    print(f'Starting training [{mode}{stop_label}] — close pygame window to stop.')
-    print(f'{"Game":>6}  {"Score":>6}  {"Best":>6}  {"Mean":>8}  {"Roll100":>8}  {"Time":>8}')
-    print('-' * 55)
+    if not quiet:
+        mode = 'headless' if headless else ('visual fast' if fast else 'visual')
+        stop_notes = []
+        if max_games is not None:
+            stop_notes.append(f'stop after {max_games} games')
+        if target_score is not None:
+            stop_notes.append(f'stop at score {target_score}')
+        stop_label = f", {', '.join(stop_notes)}" if stop_notes else ''
+        print(f'Starting training [{mode}{stop_label}] — close pygame window to stop.')
+        print(f'{"Game":>6}  {"Score":>6}  {"Best":>6}  {"Mean":>8}  {"Roll100":>8}  {"Time":>8}')
+        print('-' * 55)
+    elif not headless:
+        print(f'Training visually — watch the pygame window ({max_games or "∞"} games).')
 
     while True:
         if max_games is not None and agent.n_games >= max_games:
             break
 
         if not headless:
-            game.set_game_info(agent.n_games + 1, best_length)
+            game.set_game_info(
+                agent.n_games + 1,
+                best_length,
+                training_total=max_games,
+                training_best_score=best_score,
+            )
 
         state_old = game.get_state()
         action = agent.get_action(state_old)
@@ -114,11 +130,18 @@ def train(headless=True, plot_every=25, max_games=None, target_score=None):
                 best_rolling = current_rolling
                 agent.model.save('model.pth')
 
-            print(
-                f'{agent.n_games:>6}  {score:>6}  {best_score:>6}  '
-                f'{mean_score:>8.2f}  {current_rolling:>8.2f}  '
-                f'{format_elapsed(elapsed):>8}'
+            log_game = (
+                not quiet
+                or agent.n_games == 1
+                or (max_games and agent.n_games == max_games)
+                or agent.n_games % max(plot_every, 25) == 0
             )
+            if log_game:
+                print(
+                    f'{agent.n_games:>6}  {score:>6}  {best_score:>6}  '
+                    f'{mean_score:>8.2f}  {current_rolling:>8.2f}  '
+                    f'{format_elapsed(elapsed):>8}'
+                )
 
             if agent.n_games % plot_every == 0:
                 plot(scores, mean_scores, rolling_means)
@@ -138,7 +161,11 @@ def train(headless=True, plot_every=25, max_games=None, target_score=None):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Train Snake RL agent')
     parser.add_argument('--visual', action='store_true',
-                        help='Show pygame window (much slower than headless)')
+                        help='Show pygame window while training')
+    parser.add_argument('--fast', action='store_true',
+                        help='Uncap FPS during visual training (much faster)')
+    parser.add_argument('--quiet', action='store_true',
+                        help='Minimal console output (HUD shows progress)')
     parser.add_argument('--games', type=int, default=None,
                         help='Stop after this many games (default: run until interrupted)')
     parser.add_argument('--target-score', type=int, default=None,
@@ -148,6 +175,8 @@ if __name__ == '__main__':
     args = parser.parse_args()
     train(
         headless=not args.visual,
+        fast=args.fast,
+        quiet=args.quiet,
         plot_every=args.plot_every,
         max_games=args.games,
         target_score=args.target_score,

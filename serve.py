@@ -23,25 +23,21 @@ def _quote(arg):
     return f'"{arg}"' if ' ' in arg else arg
 
 
-def spawn(command, title='Snake RL'):
-    """Open a visible terminal window so training output is not hidden."""
-    args = [_quote(PYTHON)] + [_quote(a) for a in command]
-    cmd_line = ' '.join(args)
+def _cmd_line(command):
+    return ' '.join([_quote(PYTHON)] + [_quote(a) for a in command])
 
+
+def spawn_app(command, title='Snake RL'):
+    """Launch a pygame app in its own window (no terminal)."""
+    cmd_line = _cmd_line(command)
     if sys.platform == 'win32':
         subprocess.Popen(
-            f'start "{title}" cmd /k {cmd_line}',
+            f'start "{title}" {cmd_line}',
             cwd=PROJECT_DIR,
             shell=True,
         )
-    elif sys.platform == 'darwin':
-        script = f'cd {_quote(PROJECT_DIR)} && {cmd_line}'
-        subprocess.Popen(['osascript', '-e', f'tell app "Terminal" to do script "{script}"'])
     else:
-        subprocess.Popen(
-            ['x-terminal-emulator', '-e', f'cd {PROJECT_DIR} && {cmd_line}'],
-            cwd=PROJECT_DIR,
-        )
+        subprocess.Popen([PYTHON] + command, cwd=PROJECT_DIR)
 
 
 PAGE = f"""<!DOCTYPE html>
@@ -96,6 +92,18 @@ PAGE = f"""<!DOCTYPE html>
       gap: 12px;
       margin: 24px 0;
     }}
+    .train-row {{
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 10px;
+    }}
+    .section-label {{
+      margin: 8px 0 4px;
+      font-size: 13px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }}
     button {{
       cursor: pointer;
       border: none;
@@ -140,13 +148,19 @@ PAGE = f"""<!DOCTYPE html>
 <body>
   <div class="card">
     <h1>Snake RL</h1>
-    <p>Pure self-learning DQN agent for Snake. <strong>Play</strong> opens the game window.
-    <strong>Train</strong> opens a terminal (no game window — headless training).</p>
+    <p>Pure self-learning DQN agent for Snake. <strong>Train</strong> opens a fast visual
+    pygame window so you can watch the AI learn. <strong>Play</strong> runs the trained model.</p>
     <a class="url" href="{BASE_URL}">{BASE_URL}</a>
 
     <div class="actions">
-      <button onclick="launch('play')">Play — opens pygame window</button>
-      <button class="secondary" onclick="launch('train')">Train — 100 games (opens terminal)</button>
+      <div class="section-label">Train (visual, fast)</div>
+      <div class="train-row">
+        <button class="secondary" onclick="train(100)">100 games</button>
+        <button class="secondary" onclick="train(300)">300 games</button>
+        <button class="secondary" onclick="train(1000)">1000 games</button>
+      </div>
+      <div class="section-label">Evaluate</div>
+      <button onclick="launch('play')">Play — watch trained AI</button>
     </div>
 
     <div id="status"></div>
@@ -177,6 +191,18 @@ python evaluate.py --model ./model/model_best_score.pth --games 10</pre>
       const status = document.getElementById('status');
       status.textContent = 'Launching...';
       const res = await fetch('/api/' + action, {{ method: 'POST' }});
+      const data = await res.json();
+      status.textContent = data.message;
+    }}
+
+    async function train(games) {{
+      const status = document.getElementById('status');
+      status.textContent = 'Starting training...';
+      const res = await fetch('/api/train', {{
+        method: 'POST',
+        headers: {{ 'Content-Type': 'application/json' }},
+        body: JSON.stringify({{ games }}),
+      }});
       const data = await res.json();
       status.textContent = data.message;
     }}
@@ -214,25 +240,39 @@ class LauncherHandler(BaseHTTPRequestHandler):
         else:
             self.send_error(404)
 
+    def _read_json_body(self):
+        length = int(self.headers.get('Content-Length', 0))
+        if length <= 0:
+            return {}
+        return json.loads(self.rfile.read(length))
+
     def do_POST(self):
         path = urlparse(self.path).path
         if path == '/api/play':
             if not model_exists():
                 self._json({
                     'ok': False,
-                    'message': 'No model found. Train first with train.py.',
+                    'message': 'No model found. Train first (100+ games).',
                 }, 400)
                 return
-            spawn(['evaluate.py', '--visual'], title='Snake RL — Play')
+            spawn_app(['evaluate.py', '--visual'], title='Snake RL — Play')
             self._json({
                 'ok': True,
                 'message': 'Pygame window launching — check taskbar if hidden.',
             })
         elif path == '/api/train':
-            spawn(['train.py', '--games', '100'], title='Snake RL — Train')
+            body = self._read_json_body()
+            games = int(body.get('games', 100))
+            if games not in (100, 300, 1000):
+                self._json({'ok': False, 'message': 'Choose 100, 300, or 1000 games.'}, 400)
+                return
+            spawn_app(
+                ['train.py', '--visual', '--fast', '--quiet', '--games', str(games)],
+                title=f'Snake RL — Train {games}',
+            )
             self._json({
                 'ok': True,
-                'message': 'Training terminal opening — watch scores print there (no game window).',
+                'message': f'Training window opening ({games} games) — watch the snake learn!',
             })
         else:
             self.send_error(404)

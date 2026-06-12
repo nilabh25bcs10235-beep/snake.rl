@@ -1,4 +1,11 @@
 {
-  "$schema": "https://openapi.vercel.sh/vercel.json",
-  "installCommand": "pip install -r requirements.txt"
+  "version": 2,
+  "framework": null,
+  "buildCommand": "echo Snake RL static site",
+  "outputDirectory": ".",
+  "installCommand": "echo No install needed",
+  "routes": [
+    { "src": "/", "dest": "/index.html" },
+    { "src": "/(.*)", "dest": "/index.html" }
+  ]
 }

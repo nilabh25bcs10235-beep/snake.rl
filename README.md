@@ -22,16 +22,15 @@ python serve.py
 
 Then open **[http://localhost:8080](http://localhost:8080)** in your browser.
 
-### Deploy on Vercel
+### Deploy on Vercel (static site)
 
-This repo includes a Vercel-compatible entrypoint (`api/index.py`). The live site shows project info and run instructions. The pygame game itself runs locally — not on serverless.
+Vercel hosts the **landing page** (`index.html`) with run instructions. No Python serverless — avoids Vercel function errors. The pygame game always runs **on your machine**.
 
-```bash
-# Vercel uses requirements.txt (FastAPI only)
-# ML dependencies are in requirements-ml.txt for local use
-```
+1. Import repo on [vercel.com](https://vercel.com)
+2. Set **Framework Preset** → **Other**
+3. Deploy (uses `vercel.json` automatically)
 
-After deploy, your site is live at your Vercel URL. API: `/api/status`.
+ML dependencies stay in `requirements-ml.txt` for local use only.
 
 | Button | What it does |
 |--------|----------------|
@@ -92,8 +91,8 @@ Close the pygame window to stop visual evaluation.
 
 ```
 snake.rl/
-├── api/index.py    # Vercel entrypoint (FastAPI landing page)
-├── app.py          # Re-exports api.index for local use
+├── index.html      # Vercel static landing page
+├── vercel.json     # Static deploy config (no Python functions)
 ├── serve.py        # Local launcher → http://localhost:8080
 ├── train.py        # Train the DQN agent
 ├── evaluate.py     # Run a saved model
@@ -101,7 +100,6 @@ snake.rl/
 ├── agent.py        # DQN agent + exploration
 ├── model.py        # Neural network + trainer
 ├── run.bat         # Windows one-click launcher
-├── requirements.txt      # Vercel deploy (FastAPI)
 └── requirements-ml.txt # Local ML deps (pygame, torch, …)
 ```
 
@@ -129,5 +127,6 @@ snake.rl/
 
 ## Links
 
-- **Run locally:** [http://localhost:8080](http://localhost:8080) (after `python serve.py`)
+- **Play locally:** [http://localhost:8080](http://localhost:8080) (after `python serve.py`)
+- **Live site:** your `*.vercel.app` URL (static landing page)
 - **GitHub:** [nilabh25bcs10235-beep/snake.rl](https://github.com/nilabh25bcs10235-beep/snake.rl)

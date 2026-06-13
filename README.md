@@ -2,7 +2,7 @@
 
 A pure self-learning [Deep Q-Network (DQN)](https://en.wikipedia.org/wiki/Q-learning#Deep_Q-learning) agent that learns to play Snake from scratch. No pathfinding hints or pre-programmed strategy — every move comes from the neural network.
 
-**Repository:** [github.com/nilabh25bcs10235-beep/snake.rl](https://github.com/nilabh25bcs10235-beep/snake.rl)
+
 
 ---
 
@@ -20,13 +20,13 @@ pip install -r requirements-ml.txt
 python serve.py
 ```
 
-Then open **[http://localhost:8080](http://localhost:8080)** in your browser.
+
 
 ### Deploy on Vercel (static site)
 
 Vercel hosts the **landing page** (`index.html`) with run instructions. No Python serverless — avoids Vercel function errors. The pygame game always runs **on your machine**.
 
-1. Import repo on [vercel.com](https://vercel.com)
+1. Import repo on [vercel.com](https://snake-rl-omega.vercel.app/)
 2. Set **Framework Preset** → **Other**
 3. Deploy (uses `vercel.json` automatically)
 
